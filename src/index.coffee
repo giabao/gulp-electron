@@ -179,14 +179,6 @@ module.exports = electron = (options) ->
               spawn unpackagingCmd[process.platform], next
             else next()
 
-          # If rebuild
-          # then rebuild the native module.
-          (next) ->
-            if options.rebuild
-              util.log PLUGIN_NAME, "Rebuilding modules"
-              spawn {cmd: options.apm, args: ['rebuild']}, next
-            else next()
-
           # Distribute.
           (next) ->
             wrench.mkdirSyncRecursive platformPath
