@@ -7,6 +7,7 @@ wrench = require 'wrench'
 mv = require 'mv'
 rm = require 'rimraf'
 util = require 'gulp-util'
+chalk = require 'chalk'
 PluginError = util.PluginError
 through = require 'through2'
 childProcess = require 'child_process'
@@ -110,6 +111,36 @@ module.exports = electron = (options) ->
         targetDirPath = path.resolve platformZipDir, _src
         targetPath = path.resolve platformPath
 
+        copyOption =
+          forceDelete: true
+          excludeHiddenUnix: false
+          inflateSymlinks: false
+        unpackagingCmd =
+          # http://sevenzip.sourceforge.jp/chm/cmdline/commands/extract.htm
+          win32:
+            cmd: '7z'
+            args: ['e', cacheFile, '-o', cacheedPath]
+          darwin:
+            cmd: 'unzip'
+            args: ['-o', cacheFile, '-d', cacheedPath]
+          linux:
+            cmd: 'unzip'
+            args: ['-o', cacheFile, '-d', cacheedPath]
+        packagingCmd =
+          # http://www.appveyor.com/docs/packaging-artifacts#packaging-multiple-files-in-different-locations-into-a-single-archive
+          win32:
+            cmd: '7z'
+            args: ['a', pkgZip , options.packageJson.name]
+            opts: {cwd: pkgZipPath}
+          darwin:
+            cmd: 'ditto'
+            args: [ '-c', '-k', '--sequesterRsrc', '--keepParent' , options.packageJson.name, pkgZip]
+            opts: {cwd: pkgZipPath}
+          linux:
+            cmd: 'zip'
+            args: ['-9', '-y', '-r', pkgZip , options.packageJson.name]
+            opts: {cwd: pkgZipPath}
+
         async.series [
           # If not downloaded then download the special package.
           (next) ->
@@ -145,7 +176,7 @@ module.exports = electron = (options) ->
             if not isDir cacheedPath
               wrench.mkdirSyncRecursive cacheedPath
               util.log PLUGIN_NAME, "unzip #{platform} #{options.version} electron."
-              spawn {cmd: 'unzip', args: ['-o', cacheFile, '-d', cacheedPath]}, next
+              spawn unpackagingCmd[process.platform], next
             else next()
 
           # If rebuild
@@ -159,18 +190,14 @@ module.exports = electron = (options) ->
           # Distribute.
           (next) ->
             wrench.mkdirSyncRecursive platformPath
-            wrench.copyDirSyncRecursive cacheedPath, platformPath,
-              forceDelete: true
-              excludeHiddenUnix: false
-              inflateSymlinks: false
+            wrench.copyDirSyncRecursive cacheedPath, platformPath, copyOption
             next()
           (next) ->
-            if not isExists targetAppPath
-              mv electronFile, targetAppPath, ->
-                next()
-            else next()
+            rm targetAppPath, ->
+              mv electronFile, targetAppPath, next
 
           # Distribute app.
+          # https://github.com/atom/electron/blob/master/docs/tutorial/application-distribution.md
           (next) ->
             if not isExists targetDirPath
               rm targetDirPath, next
@@ -178,25 +205,21 @@ module.exports = electron = (options) ->
           (next) ->
             util.log PLUGIN_NAME, "#{options.src} -> #{targetDir} distributing"
             wrench.mkdirSyncRecursive targetDirPath
-            wrench.copyDirSyncRecursive options.src, targetDirPath,
-              forceDelete: true
-              excludeHiddenUnix: false
-              inflateSymlinks: false
+            wrench.copyDirSyncRecursive options.src, targetDirPath, copyOption
             next()
 
           # packaging app.
           (next) ->
-            _target = packageJson.name
-            if not options.rebuild and isExists path.join pkgZipPath, pkgZip
-              _target = targetDir
-            util.log PLUGIN_NAME, "#{path.join pkgZipDir, _target} packaging"
-            mv platformPath, platformZipPath, ->
-              spawn {
-                cmd: 'zip'
-                args: ['-9', '--symlinks', '-r', pkgZip , _target]
-                opts: {cwd: pkgZipPath}
-              }, ->
-                mv platformZipPath, platformPath, next
+            util.log PLUGIN_NAME, " packaging"
+            if not options.packaging
+              return next()
+            rm platformZipPath, ->
+              mv platformPath, platformZipPath, ->
+                cmd = packagingCmd[process.platform]
+                util.log PLUGIN_NAME, "#{cmd} packaging"
+                rm pkgZip, ->
+                  spawn cmd, ->
+                    mv platformZipPath, platformPath, next
 
         ], (error, results) ->
           _zip = path.join pkgZipDir, pkgZip
