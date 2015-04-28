@@ -8,6 +8,8 @@ mv = require 'mv'
 rm = require 'rimraf'
 util = require 'gulp-util'
 chalk = require 'chalk'
+Promise = require 'promise-simple'
+Decompress = require 'decompress'
 PluginError = util.PluginError
 through = require 'through2'
 childProcess = require 'child_process'
@@ -80,46 +82,82 @@ module.exports = electron = (options) ->
         cachePath = path.resolve options.cache, options.version
         cacheFile = path.resolve cachePath, cacheZip
         cacheedPath = path.resolve cachePath, cache
+        # ex: ./release/v0.24.0/
         pkgZipDir = path.join options.release, options.version
         pkgZipPath = path.resolve pkgZipDir
+        pkgZipFilePath = path.resolve pkgZipDir, pkgZip
+        # ex: ./release/v0.24.0/darwin-x64/
         platformDir = path.join pkgZipDir, platform
         platformPath = path.resolve platformDir
-        # ex: ./release/v0.24.0/darwin-x64/
-        platformZipDir = path.join pkgZipDir, packageJson.name
-        platformZipPath = path.resolve platformZipDir
 
         src = ""
         targetApp = ""
         defaultAppName = "Electron"
         suffix = ""
+        _src = 'resources/app'
         if platform.indexOf('darwin') >= 0
           suffix = ".app"
           electronFile = "Electron" + suffix
+          targetZip = packageJson.name + suffix
+          _src = binName + '/Contents/Resources/app/'
         else if platform.indexOf('win') >= 0
           suffix = ".exe"
           electronFile = "electron" + suffix
+          targetZip = "."
         else
           electronFile = "electron"
-        # ex: ./release/v0.24.0/darwin-x64/Electron
+          targetZip = "."
+        # ex: gulp-electron-example.app
         binName = packageJson.name + suffix
-        targetAppPath = path.join platformPath , binName
-        _src = 'resources/app'
-        if platform.indexOf('darwin') >= 0
-          _src = binName + '/Contents/Resources/app/'
-        # ex: ./release/v0.24.0/darwin-x64/Electron/Contents/resources/app
-        targetDir = path.join packageJson.name, _src
-        targetDirPath = path.resolve platformZipDir, _src
-        targetPath = path.resolve platformPath
+        # ex: ./release/v0.24.0/darwin-x64/Electron.app
+        electronFileDir = path.join platformDir, electronFile
+        electronFilePath = path.resolve electronFileDir
+        # ex: ./release/v0.24.0/darwin-x64/gulp-electron-example.app
+        targetAppDir = path.join platformDir , binName
+        targetAppPath = path.resolve targetAppDir
+        # ex: ./release/v0.24.0/darwin-x64/gulp-electron-example.app/Contents/resources/app
+        targetDir = path.join platformDir, _src
+        targetDirPath = path.resolve targetDir
 
         copyOption =
           forceDelete: true
           excludeHiddenUnix: false
           inflateSymlinks: false
+        identity = ""
+        if options.platformResouces?.darwin?.identity? and isFile options.platformResouces.darwin.identity
+          identity = fs.readFileSync(options.platformResouces.darwin.identity, 'utf8').trim()
+        signingCmd =
+          # http://sevenzip.sourceforge.jp/chm/cmdline/commands/extract.htm
+          darwin: [
+              cmd: 'codesign'
+              args: ['--deep', '--force', '--verbose', '--sign', identity, path.join(targetAppDir ,'Contents', 'Frameworks', 'Electron\\ Framework.framework')]
+            ,
+              cmd: 'codesign'
+              args: ['--deep', '--force', '--verbose', '--sign', identity, path.join(targetAppDir ,'Contents', 'Frameworks', 'Electron\\ Helper EH.app')]
+            ,
+              cmd: 'codesign'
+              args: ['--deep', '--force', '--verbose', '--sign', identity, path.join(targetAppDir ,'Contents', 'Frameworks', 'Electron\\ Helper NP.app')]
+            ,
+              cmd: 'codesign'
+              args: ['--deep', '--force', '--verbose', '--sign', identity, path.join(targetAppDir ,'Contents', 'Frameworks', 'Electron\\ Helper.app')]
+            ,
+              cmd: 'codesign'
+              args: ['--deep', '--force', '--verbose', '--sign', identity, path.join(targetAppDir ,'Contents', 'Frameworks', 'ReactiveCocoa.framework')]
+            ,
+              cmd: 'codesign'
+              args: ['--deep', '--force', '--verbose', '--sign', identity, path.join(targetAppDir ,'Contents', 'Frameworks', 'Squirrel.framework')]
+            ,
+              cmd: 'codesign'
+              args: ['--deep', '--force', '--verbose', '--sign', identity, path.join(targetAppDir,'Contents', 'Frameworks', 'Mantle.framework')]
+            ,
+              cmd: 'codesign'
+              args: ['--deep', '--force', '--verbose', '--sign', identity, targetAppDir]
+          ]
         unpackagingCmd =
           # http://sevenzip.sourceforge.jp/chm/cmdline/commands/extract.htm
           win32:
             cmd: '7z'
-            args: ['e', cacheFile, '-o', cacheedPath]
+            args: ['x', cacheFile, '-o' + cacheedPath]
           darwin:
             cmd: 'unzip'
             args: ['-o', cacheFile, '-d', cacheedPath]
@@ -130,16 +168,16 @@ module.exports = electron = (options) ->
           # http://www.appveyor.com/docs/packaging-artifacts#packaging-multiple-files-in-different-locations-into-a-single-archive
           win32:
             cmd: '7z'
-            args: ['a', pkgZip , options.packageJson.name]
-            opts: {cwd: pkgZipPath}
+            args: ['a', path.join('..', pkgZip), targetZip]
+            opts: {cwd: platformPath}
           darwin:
             cmd: 'ditto'
-            args: [ '-c', '-k', '--sequesterRsrc', '--keepParent' , options.packageJson.name, pkgZip]
-            opts: {cwd: pkgZipPath}
+            args: [ '-c', '-k', '--sequesterRsrc', '--keepParent' , targetZip, path.join('..', pkgZip)]
+            opts: {cwd: platformPath}
           linux:
             cmd: 'zip'
-            args: ['-9', '-y', '-r', pkgZip , options.packageJson.name]
-            opts: {cwd: pkgZipPath}
+            args: ['-9', '-y', '-r', path.join('..', pkgZip) , targetZip]
+            opts: {cwd: platformPath}
 
         async.series [
           # If not downloaded then download the special package.
@@ -173,10 +211,15 @@ module.exports = electron = (options) ->
           # If not unziped then unzip the zip file.
           # Check if there already have an version file.
           (next) ->
+            util.log PLUGIN_NAME, "download #{platform} #{options.version} cache filie."
             if not isDir cacheedPath
               wrench.mkdirSyncRecursive cacheedPath
               util.log PLUGIN_NAME, "unzip #{platform} #{options.version} electron."
-              spawn unpackagingCmd[process.platform], next
+              new Decompress mode: '755'
+                .src cacheFile
+                .dest cacheedPath
+                .use Decompress.zip strip: 1
+                .run()
             else next()
 
           # Distribute.
@@ -185,11 +228,9 @@ module.exports = electron = (options) ->
             wrench.copyDirSyncRecursive cacheedPath, platformPath, copyOption
             next()
           (next) ->
+            util.log PLUGIN_NAME, "distributing #{targetAppDir}"
             rm targetAppPath, ->
-              mv electronFile, targetAppPath, next
-
-          # Distribute app.
-          # https://github.com/atom/electron/blob/master/docs/tutorial/application-distribution.md
+              mv electronFilePath, targetAppPath, next
           (next) ->
             if not isExists targetDirPath
               rm targetDirPath, next
@@ -199,19 +240,44 @@ module.exports = electron = (options) ->
             wrench.mkdirSyncRecursive targetDirPath
             wrench.copyDirSyncRecursive options.src, targetDirPath, copyOption
             next()
+          # signing
+          (next) ->
+            if not options.packaging
+              return next()
+            # FIXME: skip signing
+            return next()
+            if platform is "darwin-x64" and process.platform is "darwin"
+              if identity is ""
+                util.log PLUGIN_NAME, "not found identity file. skip signing"
+                return next()
+              util.log PLUGIN_NAME, "signing #{platform}"
+              promiseList = []
+              signingCmd.darwin.forEach (cmd) ->
+                p = Promise.defer()
+                promiseList.push p
+                spawn cmd, ->
+                  p.resolve()
+              Promise.when promiseList
+                .then ->
+                  util.log PLUGIN_NAME, "signing done."
+                  next()
+            else next()
 
           # packaging app.
           (next) ->
-            util.log PLUGIN_NAME, " packaging"
             if not options.packaging
               return next()
-            rm platformZipPath, ->
-              mv platformPath, platformZipPath, ->
-                cmd = packagingCmd[process.platform]
-                util.log PLUGIN_NAME, "#{cmd} packaging"
-                rm pkgZip, ->
-                  spawn cmd, ->
-                    mv platformZipPath, platformPath, next
+            if isFile pkgZipFilePath
+              rm pkgZipFilePath, next
+            else next()
+          (next) ->
+            if not options.packaging
+              return next()
+            util.log PLUGIN_NAME, "packaging"
+            cmd = packagingCmd[process.platform]
+            spawn cmd, ->
+              util.log PLUGIN_NAME, "packaging done"
+              return next()
 
         ], (error, results) ->
           _zip = path.join pkgZipDir, pkgZip
@@ -244,6 +310,7 @@ spawn = (options, callback) ->
   stdout = []
   stderr = []
   error = null
+  util.log "> #{options.cmd} #{options.args.join ' '}"
   proc = childProcess.spawn options.cmd, options.args, options.opts
   proc.stdout.on 'data', (data) ->
     stdout.push data.toString()
