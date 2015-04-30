@@ -1,3 +1,5 @@
+'use strict';
+/* jshint node:true */
 
 var electron = require('../');
 var gulp = require('gulp');

@@ -1,8 +1,12 @@
-# gulp-electron for [gulp](https://github.com/wearefractal/gulp) [![NPM version](https://badge.fury.io/js/gulp-electron.png)](http://badge.fury.io/js/gulp-electron)
+gulp-electron for [gulp](https://github.com/wearefractal/gulp) [![NPM version](https://badge.fury.io/js/gulp-electron.png)](http://badge.fury.io/js/gulp-electron)
+=======
+
+[![Dependencies Status][david-image]][david-url] [![Build Status][travis-image]][travis-url] [![Code coverage][coveralls-image]][coveralls-url] [![Code quality][codeclimate-image]][codeclimate-url] [![Release][npm-image]][npm-url]
 
 > A gulp plugin that creates electron based distributable applications.
 
-## Install
+Install
+-----
 
 Install with [npm](https://npmjs.org/package/gulp-electron).
 
@@ -10,7 +14,8 @@ Install with [npm](https://npmjs.org/package/gulp-electron).
 npm install --save-dev gulp-electron
 ```
 
-## Usage
+Usage
+-----
 
 
 Add a gulp electron task like :
@@ -54,6 +59,7 @@ When you run code under `process.NODE_ENV = test` more debug information will be
 * `ext` The package extention for the electron package, default is `zip`
 
 
-## License
+License
+-----
 
 MIT
