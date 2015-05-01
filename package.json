@@ -36,8 +36,8 @@
     "progress": "^1.1.5",
     "promise-simple": "^0.1.0",
     "rimraf": "^2.3.2",
-    "through2": "^0.6.5",
-    "vinyl": "^0.2.3",
+    "through2": "^1.1.1",
+    "vinyl": "^0.4.6",
     "wrench": "^1.5.8"
   }
 }
