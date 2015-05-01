@@ -1,7 +1,7 @@
 gulp-electron for [gulp](https://github.com/wearefractal/gulp) [![NPM version](https://badge.fury.io/js/gulp-electron.png)](http://badge.fury.io/js/gulp-electron)
 =======
 
-[![Dependencies Status][david-image]][david-url] [![Build Status][travis-image]][travis-url] [![Code coverage][coveralls-image]][coveralls-url] [![Code quality][codeclimate-image]][codeclimate-url] [![Release][npm-image]][npm-url]
+[![Build Status](https://travis-ci.org/mainyaa/gulp-electron.svg?branch=master)](https://travis-ci.org/mainyaa/gulp-electron) [![AppVayor status](https://ci.appveyor.com/api/projects/status/32r7s2skrgm9ubva/branch/master?svg=true)](https://ci.appveyor.com/project/mainyaa/gulp-electron) [![Dependency Status](https://david-dm.org/mainyaa/gulp-electron.svg)](https://david-dm.org/mainyaa/gulp-electron) [![Coverage Status](https://coveralls.io/repos/mainyaa/gulp-electron/badge.svg)](https://coveralls.io/r/mainyaa/gulp-electron) [![Code Climate](https://codeclimate.com/github/mainyaa/gulp-electron/badges/gpa.svg)](https://codeclimate.com/github/mainyaa/gulp-electron)
 
 > A gulp plugin that creates electron based distributable applications.
 
