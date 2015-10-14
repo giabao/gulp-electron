@@ -1,3 +1,5 @@
+'use strict';
+/* jshint node:true */
 
 var electron = require('../');
 var gulp = require('gulp');
@@ -15,9 +17,26 @@ gulp.task('electron', function() {
         packageJson: packageJson,
         release: './release',
         cache: './cache',
-        version: 'v0.24.0',
+        version: 'v0.26.1',
         rebuild: false,
-        platforms: ['win32-ia32', 'darwin-x64']
+        packaging: true,
+        asar: true,
+        platforms: ['win32-ia32', 'darwin-x64'],
+        platformResources: {
+            darwin: {
+                CFBundleDisplayName: packageJson.name,
+                CFBundleIdentifier: packageJson.name,
+                CFBundleName: packageJson.name,
+                CFBundleVersion: packageJson.version,
+                icon: 'gulp-electron.icns'
+            },
+            win: {
+                "version-string": packageJson.version,
+                "file-version": packageJson.version,
+                "product-version": packageJson.version,
+                "icon": 'gulp-electron.ico'
+            }
+        }
     }))
     .pipe(gulp.dest(""));
 });
